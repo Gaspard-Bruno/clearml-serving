@@ -1,5 +1,5 @@
 import os
-from typing import Optional, Any, Callable, List
+from typing import Dict, Optional, Any, Callable, List
 
 import numpy as np
 from clearml import Task, Model
@@ -305,24 +305,33 @@ class TritonPreprocessRequest(BasePreprocessRequest):
         request.model_version = "1"
 
         # take the input data
-        input_data = np.array(data, dtype=self.model_endpoint.input_type)
+        if isinstance(data, Dict):
+            for name, value in data.items():
+                input_data = np.array(value, dtype=self.model_endpoint.input_type)
+                input_tensor = request.InferInputTensor()
+                input_tensor.name = name
+                input_tensor.datatype = value.dtype
+                input_tensor.shape.extend(value.shape)
+                request.inputs.append(input_tensor)
+        else:
+            input_data = np.array(data, dtype=self.model_endpoint.input_type)
 
-        # Populate the inputs in inference request
-        input0 = request.InferInputTensor()
-        input0.name = self.model_endpoint.input_name
-        input_dtype = np.dtype(self.model_endpoint.input_type).type
-        input0.datatype = self._ext_np_to_triton_dtype(input_dtype)
-        input0.shape.extend(self.model_endpoint.input_size)
+            # Populate the inputs in inference request
+            input0 = request.InferInputTensor()
+            input0.name = self.model_endpoint.input_name
+            input_dtype = np.dtype(self.model_endpoint.input_type).type
+            input0.datatype = self._ext_np_to_triton_dtype(input_dtype)
+            input0.shape.extend(self.model_endpoint.input_size)
 
-        # to be inferred
-        input_func = self._content_lookup.get(input_dtype)
-        if not input_func:
-            raise ValueError("Input type nt supported {}".format(input_dtype))
-        input_func = getattr(input0.contents, input_func)
-        input_func[:] = input_data.flatten()
+            # to be inferred
+            input_func = self._content_lookup.get(input_dtype)
+            if not input_func:
+                raise ValueError("Input type nt supported {}".format(input_dtype))
+            input_func = getattr(input0.contents, input_func)
+            input_func[:] = input_data.flatten()
 
-        # push into request
-        request.inputs.extend([input0])
+            # push into request
+            request.inputs.extend([input0])
 
         # Populate the outputs in the inference request
         output0 = request.InferRequestedOutputTensor()
