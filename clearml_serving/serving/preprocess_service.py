@@ -310,7 +310,7 @@ class TritonPreprocessRequest(BasePreprocessRequest):
                 input_data = np.array(value, dtype=self.model_endpoint.input_type)
                 input_tensor = request.InferInputTensor()
                 input_tensor.name = name
-                input_tensor.datatype = value.dtype
+                input_tensor.datatype = self._ext_np_to_triton_dtype(value.dtype)
                 input_tensor.shape.extend(value.shape)
                 request.inputs.append(input_tensor)
         else:
